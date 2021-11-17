@@ -10,6 +10,8 @@ fn main() {
     
     // can listen tcp
     let listner = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    println!("* Server start at --> {:?}", listner.local_addr());
     //*---------------------------------------------------------------------------------------------------*//
     //                                                                                                     //
     // Create pool of threards :                                                                           //
@@ -34,6 +36,7 @@ fn main() {
         pool.execute(|| {
             // fn for handle new connection
             handle_connection(stream);
+
         });
 
     }

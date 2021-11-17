@@ -7,7 +7,7 @@ use std::sync::Mutex;
 pub struct ThreadPool {
 
     workers: Vec<Worker>,
-    sender: mpsc::Sender<Job>,
+    sender: mpsc::Sender<Message>,
 
 }
 
@@ -36,6 +36,15 @@ impl<F: FnOnce()> FnBox for F {
 
 type Job = Box<dyn FnBox + Send + 'static>;
 
+enum Message {
+    
+    // avalible Job
+    NewJob(Job),
+    // or kill thread
+    Terminate,
+
+}
+
 impl ThreadPool {
 
     // fn for creating new pool for threads
@@ -52,7 +61,7 @@ impl ThreadPool {
 
         //              *** For safe use a single receiving end: ***         //
         //                                                                   //
-        // - with Arc we allow the worker to clone the pointer to the Mutex, //
+        // - Arc allow the worker to clone the pointer to the Mutex, //
         //   which allows the workers to use in turn receiver                //
         //                                                                   //
         let receiver = Arc::new(Mutex::new(receiver));
@@ -63,7 +72,7 @@ impl ThreadPool {
         // use counter for adding in Vec our workers amount with id
         for id in 0..size {
 
-            // reciver in Worker::new and then using into closure
+            // adding in workers vec new Worker with id and the pointer to the reciver
             workers.push(Worker::new(id, Arc::clone(&receiver)));
 
         }
@@ -99,7 +108,7 @@ impl ThreadPool {
         //make job with the closure
         let job = Box::new(f);
         //send job
-        self.sender.send(job).unwrap();
+        self.sender.send(Message::NewJob(job)).unwrap();
 
     }
 
@@ -108,6 +117,14 @@ impl ThreadPool {
 impl Drop for ThreadPool {
 
     fn drop(&mut self) {
+
+        println!("---* All Workers are deactivated --> job is complite *---");
+
+        for _ in &mut self.workers {
+
+            self.sender.send(Message::Terminate).unwrap();
+
+        }
 
         for worker in &mut self.workers {
 
@@ -128,7 +145,7 @@ impl Drop for ThreadPool {
 impl Worker {
 
     //fn for creating new thread in Worker 
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
 
         // creating a new threard
         let thread = thread::spawn(move || {
@@ -136,11 +153,26 @@ impl Worker {
             loop  {
                 // - lock() for mutex: if panic it's mean that some worker can't return lock
                 // - recv() for next Jobfrom chanel
-                let job = receiver.lock().unwrap().recv().unwrap();
+                let message = receiver.lock().unwrap().recv().unwrap();
 
-                println!("---* Worker id: {} get a job --> job is running *---", id);
+                match message {
 
-                job.call_box();
+                    Message::NewJob(job) => {
+
+                        println!("---* Worker id: {} get a job --> job is running *---", id);
+
+                        job.call_box();
+
+                    },
+
+                    Message::Terminate => {
+
+                        println!("---* Worker id: {} stop job --> job is stop *---", id);
+
+                        break;
+
+                    }
+                }
 
             }
 
