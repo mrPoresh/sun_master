@@ -5,7 +5,7 @@
 This repo contains a http server is writing using standart language features (std).
 This server can handle two types of reqests:
 
----> http://127.0.0.1:7878/auth
+---> http://127.0.0.1:7878
 
 ---> http://127.0.0.1:7878/"anything"
 
